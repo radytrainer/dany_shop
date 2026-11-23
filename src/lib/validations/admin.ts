@@ -59,6 +59,26 @@ export const optionalImageUrl = z
   .transform((v) => (v ? v : null));
 
 /** Internal links ("/shop?sale=1") or https URLs only. */
+/** A required https link on one of the given sites (e.g. the shop's Facebook page). */
+export function requiredSocialLink(hosts: string[], example: string) {
+  const message = `Required — e.g. ${example}`;
+  return z
+    .union([z.string(), z.null()], { message })
+    .optional()
+    .transform((v) => (v ?? "").trim())
+    .refine((v) => v !== "", message)
+    .refine((v) => {
+      if (v === "") return true; // reported above
+      try {
+        const url = new URL(v);
+        const host = url.hostname.replace(/^www\./, "").replace(/^m\./, "");
+        return url.protocol === "https:" && hosts.includes(host);
+      } catch {
+        return false;
+      }
+    }, `Use a link like ${example}`);
+}
+
 export const hrefSchema = z
   .union([z.string().trim().max(500), z.null()])
   .optional()
@@ -502,11 +522,18 @@ export const settingsInputSchema = z
       .transform((v) => (v ? v : null)),
     contactPhone: optionalText(40),
     address: optionalText(300),
+    // Facebook and Telegram are how most customers in Cambodia reach the shop: required.
     socialLinks: z.object({
+      facebook: requiredSocialLink(
+        ["facebook.com", "fb.com", "me"],
+        "https://facebook.com/yourpage",
+      ),
+      telegram: requiredSocialLink(
+        ["t.me", "telegram.me"],
+        "https://t.me/yourshop",
+      ),
       instagram: hrefSchema,
-      facebook: hrefSchema,
       tiktok: hrefSchema,
-      telegram: hrefSchema,
       youtube: hrefSchema,
     }),
     footerText: optionalText(500),

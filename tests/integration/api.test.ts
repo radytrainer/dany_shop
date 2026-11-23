@@ -125,7 +125,7 @@ describe("order messaging settings", () => {
   const save = async (patch: Record<string, unknown>) => {
     const { getStoreSettings } = await import("@/services/settings");
     const current = await getStoreSettings();
-    return adminSettings(req("/api/admin/settings", { method: "PUT", body: JSON.stringify({ ...current, ...patch }), cookie: adminCookie }), ctx({}));
+    return adminSettings(req("/api/admin/settings", { method: "PUT", body: JSON.stringify({ ...current, socialLinks: { facebook: "https://facebook.com/danyshop", telegram: "https://t.me/danyshop" }, ...patch }), cookie: adminCookie }), ctx({}));
   };
 
   it("works with Telegram and Messenger only — WhatsApp is optional", async () => {
@@ -138,5 +138,58 @@ describe("order messaging settings", () => {
     const res = await save({ telegramUsername: null, messengerUrl: "https://m.me/danyshop", whatsappNumber: null, defaultChannel: "WHATSAPP" });
     expect(res.status).toBe(400);
     expect((await body(res)).error?.code).toBe("VALIDATION_ERROR");
+  });
+});
+
+describe("contact & social settings", () => {
+  it("keeps social links and gallery after saving when some fields are empty", async () => {
+    const { getStoreSettings } = await import("@/services/settings");
+    const current = await getStoreSettings();
+    const res = await adminSettings(
+      req("/api/admin/settings", {
+        method: "PUT",
+        cookie: adminCookie,
+        body: JSON.stringify({
+          ...current,
+          contactEmail: "shop@example.com",
+          contactPhone: "+855 12 000 111",
+          socialLinks: { instagram: null, facebook: "https://facebook.com/danyshop", tiktok: null, telegram: "https://t.me/danyshop", youtube: null },
+          socialGallery: [{ imageUrl: "/uploads/banners/a.webp", href: null }, { imageUrl: "/uploads/banners/b.webp", href: "https://instagram.com/p/1" }],
+        }),
+      }),
+      ctx({}),
+    );
+    expect(res.status).toBe(200);
+    const saved = await getStoreSettings();
+    expect(saved.contactEmail).toBe("shop@example.com");
+    expect(saved.contactPhone).toBe("+855 12 000 111");
+    expect(saved.socialLinks).toMatchObject({ facebook: "https://facebook.com/danyshop", telegram: "https://t.me/danyshop" });
+    expect(saved.socialGallery).toHaveLength(2);
+  });
+});
+
+describe("required social links", () => {
+  const save = async (socialLinks: Record<string, string | null>) => {
+    const { getStoreSettings } = await import("@/services/settings");
+    const current = await getStoreSettings();
+    return adminSettings(req("/api/admin/settings", { method: "PUT", body: JSON.stringify({ ...current, socialLinks }), cookie: adminCookie }), ctx({}));
+  };
+  const fields = async (r: Response) => ((await r.json()) as { error?: { fields?: Record<string, string> } }).error?.fields ?? {};
+
+  it("requires Facebook and Telegram; Instagram, TikTok and YouTube stay optional", async () => {
+    const res = await save({ facebook: null, telegram: "", instagram: null, tiktok: null, youtube: null });
+    expect(res.status).toBe(400);
+    expect(Object.keys(await fields(res)).sort()).toEqual(["socialLinks.facebook", "socialLinks.telegram"]);
+  });
+
+  it("rejects links to the wrong site or without https", async () => {
+    const res = await save({ facebook: "https://instagram.com/danyshop", telegram: "http://t.me/danyshop" });
+    expect(res.status).toBe(400);
+    expect(Object.keys(await fields(res)).sort()).toEqual(["socialLinks.facebook", "socialLinks.telegram"]);
+  });
+
+  it("accepts facebook.com, m.me and t.me links with the rest empty", async () => {
+    expect((await save({ facebook: "https://www.facebook.com/danyshop", telegram: "https://t.me/danyshop", instagram: null, tiktok: null, youtube: null })).status).toBe(200);
+    expect((await save({ facebook: "https://m.me/danyshop", telegram: "https://t.me/danyshop" })).status).toBe(200);
   });
 });

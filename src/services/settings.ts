@@ -23,16 +23,26 @@ export type HomepageSectionKey = (typeof HOMEPAGE_SECTION_KEYS)[number];
 const sectionsSchema = z
   .array(z.object({ key: z.enum(HOMEPAGE_SECTION_KEYS), enabled: z.boolean() }))
   .catch([]);
+// The admin saves empty fields as null. Read them back as "not set" — never let one empty or
+// malformed field discard the others (that used to wipe every social link / the whole gallery).
+const optionalLink = z
+  .string()
+  .nullish()
+  .transform((v) => v || undefined)
+  .catch(undefined)
+  .optional();
 const socialLinksSchema = z
   .object({
-    instagram: z.string().optional(),
-    facebook: z.string().optional(),
-    tiktok: z.string().optional(),
-    telegram: z.string().optional(),
-    youtube: z.string().optional(),
+    instagram: optionalLink,
+    facebook: optionalLink,
+    tiktok: optionalLink,
+    telegram: optionalLink,
+    youtube: optionalLink,
   })
   .catch({});
-const gallerySchema = z.array(z.object({ imageUrl: z.string(), href: z.string().optional() })).catch([]);
+const gallerySchema = z
+  .array(z.object({ imageUrl: z.string(), href: optionalLink }))
+  .catch([]);
 const translatedTextSchema = z.record(z.string(), z.record(z.string(), z.string())).catch({});
 
 export type SocialLinks = z.infer<typeof socialLinksSchema>;
