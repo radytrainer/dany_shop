@@ -233,8 +233,10 @@ export function SettingsForm({ initial }: { initial: StoreSettingsDTO }) {
       <Card>
         <h2 className="mb-1 text-sm font-semibold">Order messaging</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          Customers send their saved order to you through these apps. Set at
-          least one; leave an app empty to hide it at checkout.
+          Customers send their saved order to you through these apps. Telegram
+          and Messenger are filled in automatically from your Facebook and
+          Telegram links under Contact &amp; social — change them here only if
+          orders should go to a different account. WhatsApp is optional.
         </p>
         <div className="grid gap-3">
           <Field label="Telegram username" hint="Without @ — e.g. danyshop">

@@ -193,3 +193,37 @@ describe("required social links", () => {
     expect((await save({ facebook: "https://m.me/danyshop", telegram: "https://t.me/danyshop" })).status).toBe(200);
   });
 });
+
+describe("order messaging from Contact & social links", () => {
+  it("lets customers order when only the Facebook and Telegram links are filled in", async () => {
+    const { getStoreSettings } = await import("@/services/settings");
+    const current = await getStoreSettings();
+    const res = await adminSettings(
+      req("/api/admin/settings", {
+        method: "PUT",
+        cookie: adminCookie,
+        body: JSON.stringify({
+          ...current,
+          telegramUsername: null,
+          messengerUrl: null,
+          whatsappNumber: null,
+          defaultChannel: "TELEGRAM",
+          socialLinks: { facebook: "https://www.facebook.com/Rady.bmcs/", telegram: "https://t.me/radytv" },
+        }),
+      }),
+      ctx({}),
+    );
+    expect(res.status).toBe(200);
+    const s = await getStoreSettings();
+    expect(s.telegramUsername).toBe("radytv");
+    expect(s.messengerUrl).toBe("https://m.me/Rady.bmcs");
+
+    const { buildSellerMessaging, getAccessibleOrder } = await import("@/services/orders");
+    const order = await prisma.order.findFirstOrThrow();
+    const full = await getAccessibleOrder(order.orderNumber, { isStaff: true });
+    const { links } = await buildSellerMessaging(full!, null);
+    expect(links.TELEGRAM).toMatch(/^https:\/\/t\.me\/radytv\?text=/);
+    expect(links.MESSENGER).toBe("https://m.me/Rady.bmcs");
+    expect(links.WHATSAPP).toBeNull();
+  });
+});

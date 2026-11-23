@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { messengerFromFacebookUrl, telegramUsernameFromLink } from "@/lib/messaging/order-message";
 
 export const slugSchema = z
   .string()
@@ -555,8 +556,9 @@ export const settingsInputSchema = z
   })
   .superRefine((s, ctx) => {
     const configured = {
-      TELEGRAM: s.telegramUsername,
-      MESSENGER: s.messengerUrl,
+      // Same fallback as the storefront: the Contact & social links count as configured accounts.
+      TELEGRAM: s.telegramUsername || telegramUsernameFromLink(s.socialLinks.telegram),
+      MESSENGER: s.messengerUrl || messengerFromFacebookUrl(s.socialLinks.facebook),
       WHATSAPP: s.whatsappNumber,
     };
     const anySet = Object.values(configured).some(Boolean);

@@ -140,3 +140,55 @@ export function messengerLink(url: string | null | undefined): string | null {
     return null;
   }
 }
+
+/**
+ * Telegram username from a t.me link (https://t.me/radytv → "radytv"). Used when the seller filled
+ * in the Telegram link under "Contact & social" but not the order-messaging username.
+ * Group/channel invite links (t.me/+abc, t.me/joinchat/…) are not a chat with the seller → null.
+ */
+export function telegramUsernameFromLink(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (!["t.me", "www.t.me", "telegram.me", "www.telegram.me"].includes(u.hostname)) return null;
+    const first = u.pathname.split("/").filter(Boolean)[0] ?? "";
+    // Reserved t.me paths are invites, shares and add-ons, not a person or shop account.
+    if (["joinchat", "addstickers", "addemoji", "share", "proxy", "socks", "iv", "setlanguage", "addtheme", "c", "s"].includes(first.toLowerCase())) return null;
+    return normalizeTelegramUsername(first);
+  } catch {
+    return null;
+  }
+}
+
+const FACEBOOK_HOSTS = ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com", "fb.com", "www.fb.com"];
+const FACEBOOK_NOT_A_PAGE = new Set(["groups", "events", "share", "watch", "marketplace", "story.php", "permalink.php", "photo", "photo.php", "reel", "hashtag", "login", "home.php"]);
+
+/**
+ * Messenger chat link from a Facebook page/profile URL, e.g.
+ * https://www.facebook.com/Rady.bmcs/ → https://m.me/Rady.bmcs
+ * https://facebook.com/profile.php?id=123 → https://m.me/123
+ * Returns null for links that are not a page or profile (groups, posts, …).
+ */
+export function messengerFromFacebookUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return null;
+    if (u.hostname === "m.me" || u.hostname === "www.m.me") return messengerLink(url);
+    if (!FACEBOOK_HOSTS.includes(u.hostname)) return null;
+    const parts = u.pathname.split("/").filter(Boolean);
+    if (parts[0] === "profile.php") {
+      const id = u.searchParams.get("id");
+      return id && /^\d+$/.test(id) ? `https://m.me/${id}` : null;
+    }
+    if (parts[0] === "pages" || parts[0] === "people") {
+      const id = [...parts].reverse().find((p) => /^\d+$/.test(p));
+      return id ? `https://m.me/${id}` : null;
+    }
+    const name = parts[0];
+    if (!name || FACEBOOK_NOT_A_PAGE.has(name.toLowerCase())) return null;
+    return /^[A-Za-z0-9.]{3,100}$/.test(name) ? `https://m.me/${name}` : null;
+  } catch {
+    return null;
+  }
+}

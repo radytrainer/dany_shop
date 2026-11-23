@@ -3,6 +3,7 @@ import { cache } from "react";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { storefrontCache } from "@/lib/shared-cache";
+import { messengerFromFacebookUrl, telegramUsernameFromLink } from "@/lib/messaging/order-message";
 import type { Locale } from "@/i18n/config";
 
 export const HOMEPAGE_SECTION_KEYS = [
@@ -132,6 +133,7 @@ const loadStoreSettings = storefrontCache(async (): Promise<StoreSettingsDTO> =>
   // Make sure every known section appears exactly once (new sections default to enabled).
   const known = new Set(sections.map((s) => s.key));
   const homepageSections = [...sections, ...HOMEPAGE_SECTION_KEYS.filter((k) => !known.has(k)).map((key) => ({ key, enabled: true }))];
+  const socialLinks = socialLinksSchema.parse(row.socialLinks);
   return {
     storeName: row.storeName,
     tagline: row.tagline,
@@ -141,8 +143,10 @@ const loadStoreSettings = storefrontCache(async (): Promise<StoreSettingsDTO> =>
     defaultLocale: row.defaultLocale,
     khrExchangeRate: row.khrExchangeRate?.toFixed(2) ?? null,
     showKhrEquivalent: row.showKhrEquivalent,
-    telegramUsername: row.telegramUsername,
-    messengerUrl: row.messengerUrl,
+    // Order messaging falls back to the Contact & social links, so the seller only has to enter
+    // their Telegram / Facebook once (t.me/name → name, facebook.com/page → m.me/page).
+    telegramUsername: row.telegramUsername || telegramUsernameFromLink(socialLinks.telegram),
+    messengerUrl: row.messengerUrl || messengerFromFacebookUrl(socialLinks.facebook),
     whatsappNumber: row.whatsappNumber,
     defaultChannel: row.defaultChannel,
     minOrderAmount: row.minOrderAmount?.toFixed(2) ?? null,
@@ -155,7 +159,7 @@ const loadStoreSettings = storefrontCache(async (): Promise<StoreSettingsDTO> =>
     contactEmail: row.contactEmail,
     contactPhone: row.contactPhone,
     address: row.address,
-    socialLinks: socialLinksSchema.parse(row.socialLinks),
+    socialLinks,
     footerText: row.footerText,
     shippingInfo: row.shippingInfo,
     sizeGuide: row.sizeGuide,

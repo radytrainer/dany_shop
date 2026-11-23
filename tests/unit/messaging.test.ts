@@ -85,3 +85,27 @@ describe("csv export", () => {
     expect(csvCell(null)).toBe("");
   });
 });
+
+describe("messaging accounts from Contact & social links", () => {
+  it("reads the Telegram username from a t.me link", async () => {
+    const { telegramUsernameFromLink } = await import("@/lib/messaging/order-message");
+    expect(telegramUsernameFromLink("https://t.me/radytv")).toBe("radytv");
+    expect(telegramUsernameFromLink("https://telegram.me/dany_shop/")).toBe("dany_shop");
+    expect(telegramUsernameFromLink("https://t.me/+AbCdEf123")).toBeNull(); // invite link, not a chat
+    expect(telegramUsernameFromLink("https://t.me/joinchat/xyz")).toBeNull();
+    expect(telegramUsernameFromLink("https://example.com/radytv")).toBeNull();
+    expect(telegramUsernameFromLink(null)).toBeNull();
+  });
+
+  it("turns a Facebook page or profile into a Messenger chat link", async () => {
+    const { messengerFromFacebookUrl } = await import("@/lib/messaging/order-message");
+    expect(messengerFromFacebookUrl("https://www.facebook.com/Rady.bmcs/")).toBe("https://m.me/Rady.bmcs");
+    expect(messengerFromFacebookUrl("https://m.facebook.com/danyshop")).toBe("https://m.me/danyshop");
+    expect(messengerFromFacebookUrl("https://www.facebook.com/profile.php?id=100012345678")).toBe("https://m.me/100012345678");
+    expect(messengerFromFacebookUrl("https://www.facebook.com/pages/Dany-Shop/123456789")).toBe("https://m.me/123456789");
+    expect(messengerFromFacebookUrl("https://m.me/danyshop")).toBe("https://m.me/danyshop");
+    expect(messengerFromFacebookUrl("https://www.facebook.com/groups/123")).toBeNull();
+    expect(messengerFromFacebookUrl("https://www.facebook.com/share/abc")).toBeNull();
+    expect(messengerFromFacebookUrl("http://facebook.com/danyshop")).toBeNull();
+  });
+});
