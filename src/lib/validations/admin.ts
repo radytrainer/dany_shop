@@ -6,18 +6,31 @@ export const slugSchema = z
   .toLowerCase()
   .min(1)
   .max(120)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Use lowercase letters, numbers and hyphens");
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    "Use lowercase letters, numbers and hyphens",
+  );
 
 export const moneyString = z
   .union([z.string(), z.number()])
   .transform((v) => String(v).trim())
-  .refine((v) => /^\d{1,9}(\.\d{1,2})?$/.test(v), "Enter a valid amount (e.g. 15 or 15.50)");
+  .refine(
+    (v) => /^\d{1,9}(\.\d{1,2})?$/.test(v),
+    "Enter a valid amount (e.g. 15 or 15.50)",
+  );
 
 export const optionalMoney = z
   .union([z.string(), z.number(), z.null()])
   .optional()
-  .transform((v) => (v === null || v === undefined || String(v).trim() === "" ? null : String(v).trim()))
-  .refine((v) => v === null || /^\d{1,9}(\.\d{1,2})?$/.test(v), "Enter a valid amount");
+  .transform((v) =>
+    v === null || v === undefined || String(v).trim() === ""
+      ? null
+      : String(v).trim(),
+  )
+  .refine(
+    (v) => v === null || /^\d{1,9}(\.\d{1,2})?$/.test(v),
+    "Enter a valid amount",
+  );
 
 const optionalText = (max: number) =>
   z
@@ -34,7 +47,9 @@ export const imageUrlSchema = z
   .trim()
   .max(1000)
   .refine(
-    (v) => (/^\/(uploads|brand|logo)\/[\w\-./]+$/.test(v) && !v.includes("..")) || /^https:\/\/[^\s]+$/.test(v),
+    (v) =>
+      (/^\/(uploads|brand|logo)\/[\w\-./]+$/.test(v) && !v.includes("..")) ||
+      /^https:\/\/[^\s]+$/.test(v),
     "Invalid image URL",
   );
 
@@ -48,7 +63,13 @@ export const hrefSchema = z
   .union([z.string().trim().max(500), z.null()])
   .optional()
   .transform((v) => (v ? v : null))
-  .refine((v) => v === null || (v.startsWith("/") && !v.startsWith("//")) || /^https:\/\/[^\s]+$/.test(v), "Use a relative path (/shop) or an https URL");
+  .refine(
+    (v) =>
+      v === null ||
+      (v.startsWith("/") && !v.startsWith("//")) ||
+      /^https:\/\/[^\s]+$/.test(v),
+    "Use a relative path (/shop) or an https URL",
+  );
 
 const dateish = z
   .union([z.string(), z.null()])
@@ -62,7 +83,12 @@ export const productInputSchema = z
   .object({
     name: z.string().trim().min(2).max(160),
     slug: z.union([slugSchema, z.literal("")]).optional(),
-    sku: z.string().trim().min(2).max(60).regex(/^[A-Za-z0-9_-]+$/, "Letters, numbers, - and _ only"),
+    sku: z
+      .string()
+      .trim()
+      .min(2)
+      .max(60)
+      .regex(/^[A-Za-z0-9_-]+$/, "Letters, numbers, - and _ only"),
     shortDescription: optionalText(300),
     description: z.string().trim().min(1).max(10000),
     categoryId: z.string().uuid("Choose a category"),
@@ -75,9 +101,18 @@ export const productInputSchema = z
     isBestSeller: z.boolean(),
     tags: z.array(z.string().trim().toLowerCase().min(1).max(40)).max(30),
     lowStockThreshold: z.coerce.number().int().min(0).max(1000),
-    condition: z.enum(["NEW_WITH_TAGS", "LIKE_NEW", "EXCELLENT", "GOOD", "FAIR"]).nullable().default(null),
+    condition: z
+      .enum(["NEW_WITH_TAGS", "LIKE_NEW", "EXCELLENT", "GOOD", "FAIR"])
+      .nullable()
+      .default(null),
     translations: z
-      .object({ km: z.object({ name: optionalText(160), shortDescription: optionalText(300), description: optionalText(10000) }) })
+      .object({
+        km: z.object({
+          name: optionalText(160),
+          shortDescription: optionalText(300),
+          description: optionalText(10000),
+        }),
+      })
       .partial()
       .default({}),
     images: z
@@ -98,7 +133,12 @@ export const productInputSchema = z
           id: z.string().uuid().optional(),
           sizeId: z.string().uuid(),
           colorId: z.string().uuid(),
-          sku: z.string().trim().min(2).max(80).regex(/^[A-Za-z0-9_-]+$/, "Letters, numbers, - and _ only"),
+          sku: z
+            .string()
+            .trim()
+            .min(2)
+            .max(80)
+            .regex(/^[A-Za-z0-9_-]+$/, "Letters, numbers, - and _ only"),
           priceOverride: optionalMoney,
           stock: z.coerce.number().int().min(0).max(1_000_000),
           isActive: z.boolean(),
@@ -110,16 +150,30 @@ export const productInputSchema = z
   })
   .superRefine((p, ctx) => {
     if (p.salePrice !== null && Number(p.salePrice) >= Number(p.price)) {
-      ctx.addIssue({ code: "custom", path: ["salePrice"], message: "Sale price must be lower than the regular price" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["salePrice"],
+        message: "Sale price must be lower than the regular price",
+      });
     }
     const combos = new Set<string>();
     const skus = new Set<string>();
     p.variants.forEach((v, i) => {
       const key = `${v.sizeId}:${v.colorId}`;
-      if (combos.has(key)) ctx.addIssue({ code: "custom", path: ["variants", i, "sizeId"], message: "Duplicate size/colour combination" });
+      if (combos.has(key))
+        ctx.addIssue({
+          code: "custom",
+          path: ["variants", i, "sizeId"],
+          message: "Duplicate size/colour combination",
+        });
       combos.add(key);
       const sku = v.sku.toUpperCase();
-      if (skus.has(sku)) ctx.addIssue({ code: "custom", path: ["variants", i, "sku"], message: "Duplicate variant SKU" });
+      if (skus.has(sku))
+        ctx.addIssue({
+          code: "custom",
+          path: ["variants", i, "sku"],
+          message: "Duplicate variant SKU",
+        });
       skus.add(sku);
     });
   });
@@ -131,7 +185,12 @@ export const categoryInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   slug: slugSchema,
   description: optionalText(1000),
-  parentId: z.string().uuid().nullable().optional().transform((v) => v ?? null),
+  parentId: z
+    .string()
+    .uuid()
+    .nullable()
+    .optional()
+    .transform((v) => v ?? null),
   imageUrl: optionalImageUrl,
   bannerUrl: optionalImageUrl,
   sortOrder: z.coerce.number().int().min(0).max(10000).default(0),
@@ -141,7 +200,9 @@ export const categoryInputSchema = z.object({
   descriptionKm: optionalText(1000),
 });
 
-export const reorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
+export const reorderSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(500),
+});
 
 // ───────────────────────────── Orders ─────────────────────────────
 
@@ -172,8 +233,16 @@ export const orderPatchSchema = z.object({
 export const orderListQuerySchema = z.object({
   q: z.string().trim().max(100).optional(),
   status: z.enum(ORDER_STATUSES).optional().catch(undefined),
-  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().catch(undefined),
-  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().catch(undefined),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .catch(undefined),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .catch(undefined),
   customer: z.string().uuid().optional().catch(undefined),
   page: z.coerce.number().int().min(1).max(10000).catch(1).default(1),
 });
@@ -202,16 +271,54 @@ const discountBase = {
   isActive: z.boolean().default(true),
 };
 
-function checkDiscount(d: { type: string; value: string; scope: string; categoryIds: string[]; productIds: string[] }, ctx: z.RefinementCtx) {
-  if (d.type === "PERCENTAGE" && (Number(d.value) <= 0 || Number(d.value) > 100)) ctx.addIssue({ code: "custom", path: ["value"], message: "Percentage must be between 0 and 100" });
-  if (d.type === "FIXED" && Number(d.value) <= 0) ctx.addIssue({ code: "custom", path: ["value"], message: "Amount must be greater than 0" });
-  if (d.scope === "CATEGORY" && d.categoryIds.length === 0) ctx.addIssue({ code: "custom", path: ["categoryIds"], message: "Choose at least one category" });
-  if (d.scope === "PRODUCT" && d.productIds.length === 0) ctx.addIssue({ code: "custom", path: ["productIds"], message: "Choose at least one product" });
+function checkDiscount(
+  d: {
+    type: string;
+    value: string;
+    scope: string;
+    categoryIds: string[];
+    productIds: string[];
+  },
+  ctx: z.RefinementCtx,
+) {
+  if (
+    d.type === "PERCENTAGE" &&
+    (Number(d.value) <= 0 || Number(d.value) > 100)
+  )
+    ctx.addIssue({
+      code: "custom",
+      path: ["value"],
+      message: "Percentage must be between 0 and 100",
+    });
+  if (d.type === "FIXED" && Number(d.value) <= 0)
+    ctx.addIssue({
+      code: "custom",
+      path: ["value"],
+      message: "Amount must be greater than 0",
+    });
+  if (d.scope === "CATEGORY" && d.categoryIds.length === 0)
+    ctx.addIssue({
+      code: "custom",
+      path: ["categoryIds"],
+      message: "Choose at least one category",
+    });
+  if (d.scope === "PRODUCT" && d.productIds.length === 0)
+    ctx.addIssue({
+      code: "custom",
+      path: ["productIds"],
+      message: "Choose at least one product",
+    });
 }
 
 export const couponInputSchema = z
   .object({
-    code: z.string().trim().toUpperCase().min(3).max(40).regex(/^[A-Z0-9_-]+$/, "Letters, numbers, - and _ only"),
+    code: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .min(3)
+      .max(40)
+      .regex(/^[A-Z0-9_-]+$/, "Letters, numbers, - and _ only"),
     description: optionalText(300),
     ...discountBase,
     minOrderAmount: optionalMoney,
@@ -219,13 +326,22 @@ export const couponInputSchema = z
     startsAt: dateish,
     expiresAt: dateish,
     usageLimit: z
-      .union([z.coerce.number().int().min(1).max(10_000_000), z.literal(""), z.null()])
+      .union([
+        z.coerce.number().int().min(1).max(10_000_000),
+        z.literal(""),
+        z.null(),
+      ])
       .optional()
       .transform((v) => (v === "" || v === undefined ? null : v)),
   })
   .superRefine((c, ctx) => {
     checkDiscount(c, ctx);
-    if (c.startsAt && c.expiresAt && c.expiresAt <= c.startsAt) ctx.addIssue({ code: "custom", path: ["expiresAt"], message: "Expiry must be after the start date" });
+    if (c.startsAt && c.expiresAt && c.expiresAt <= c.startsAt)
+      ctx.addIssue({
+        code: "custom",
+        path: ["expiresAt"],
+        message: "Expiry must be after the start date",
+      });
   });
 
 export const promotionInputSchema = z
@@ -237,7 +353,12 @@ export const promotionInputSchema = z
   })
   .superRefine((p, ctx) => {
     checkDiscount(p, ctx);
-    if (p.startsAt && p.endsAt && p.endsAt <= p.startsAt) ctx.addIssue({ code: "custom", path: ["endsAt"], message: "End must be after the start date" });
+    if (p.startsAt && p.endsAt && p.endsAt <= p.startsAt)
+      ctx.addIssue({
+        code: "custom",
+        path: ["endsAt"],
+        message: "End must be after the start date",
+      });
   });
 
 // ───────────────────────────── Content ─────────────────────────────
@@ -246,7 +367,9 @@ const kmTranslation = z
   .record(z.string(), z.string().max(2000))
   .optional()
   .default({})
-  .transform((r) => Object.fromEntries(Object.entries(r).filter(([, v]) => v.trim() !== "")));
+  .transform((r) =>
+    Object.fromEntries(Object.entries(r).filter(([, v]) => v.trim() !== "")),
+  );
 
 export const bannerInputSchema = z.object({
   placement: z.enum(["HERO", "PROMO", "EDITORIAL"]),
@@ -292,72 +415,133 @@ export const deliveryMethodInputSchema = z.object({
   estimatedDaysKm: optionalText(60),
 });
 
-export const sizeInputSchema = z.object({ name: z.string().trim().min(1).max(20), sortOrder: z.coerce.number().int().min(0).max(1000).default(0), nameKm: optionalText(40) });
+export const sizeInputSchema = z.object({
+  name: z.string().trim().min(1).max(20),
+  sortOrder: z.coerce.number().int().min(0).max(1000).default(0),
+  nameKm: optionalText(40),
+});
 export const colorInputSchema = z.object({
   name: z.string().trim().min(1).max(40),
-  hex: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "Use a hex colour like #A67C52"),
+  hex: z
+    .string()
+    .trim()
+    .regex(/^#[0-9A-Fa-f]{6}$/, "Use a hex colour like #A67C52"),
   sortOrder: z.coerce.number().int().min(0).max(1000).default(0),
   nameKm: optionalText(40),
 });
 
-const SECTION_KEYS = ["hero", "categories", "newArrivals", "promo", "bestSellers", "collections", "trending", "offers", "editorial", "newsletter", "social"] as const;
+const SECTION_KEYS = [
+  "hero",
+  "categories",
+  "newArrivals",
+  "promo",
+  "bestSellers",
+  "collections",
+  "trending",
+  "offers",
+  "editorial",
+  "newsletter",
+  "social",
+] as const;
 
-export const settingsInputSchema = z.object({
-  storeName: z.string().trim().min(1).max(60),
-  tagline: optionalText(160),
-  logoUrl: optionalImageUrl,
-  faviconUrl: optionalImageUrl,
-  currency: z.enum(["USD", "KHR"]),
-  defaultLocale: z.enum(["en", "km"]),
-  khrExchangeRate: optionalMoney,
-  showKhrEquivalent: z.boolean(),
-  telegramUsername: z
-    .union([z.string().trim().max(64), z.null()])
-    .optional()
-    .transform((v) => (v ? v.replace(/^@/, "").replace(/^https?:\/\/t\.me\//i, "") : null))
-    .refine((v) => v === null || /^[A-Za-z0-9_]{5,32}$/.test(v), "Telegram usernames are 5–32 letters, numbers or _"),
-  messengerUrl: z
-    .union([z.string().trim().max(300), z.null()])
-    .optional()
-    .transform((v) => (v ? v : null))
-    .refine((v) => v === null || /^https:\/\/(www\.)?(m\.me|messenger\.com|facebook\.com|m\.facebook\.com)\//.test(v), "Use an https://m.me/… link"),
-  whatsappNumber: z
-    .union([z.string().trim().max(30), z.null()])
-    .optional()
-    .transform((v) => (v ? v.replace(/\D/g, "") : null))
-    .refine((v) => v === null || (v.length >= 8 && v.length <= 15), "International format without +, e.g. 85512345678"),
-  defaultChannel: z.enum(["TELEGRAM", "WHATSAPP", "MESSENGER"]),
-  minOrderAmount: optionalMoney,
-  taxEnabled: z.boolean(),
-  taxRate: moneyString.refine((v) => Number(v) <= 100, "Max 100%"),
-  taxLabel: z.string().trim().min(1).max(20),
-  reservationHours: z.coerce.number().int().min(1).max(24 * 30),
-  deductStockOn: z.enum(["CONFIRMED", "PAYMENT_RECEIVED", "SHIPPED"]),
-  lowStockThreshold: z.coerce.number().int().min(0).max(1000),
-  contactEmail: z
-    .union([z.string().trim().email(), z.literal(""), z.null()])
-    .optional()
-    .transform((v) => (v ? v : null)),
-  contactPhone: optionalText(40),
-  address: optionalText(300),
-  socialLinks: z.object({
-    instagram: hrefSchema,
-    facebook: hrefSchema,
-    tiktok: hrefSchema,
-    telegram: hrefSchema,
-    youtube: hrefSchema,
-  }),
-  footerText: optionalText(500),
-  shippingInfo: optionalText(5000),
-  sizeGuide: optionalText(5000),
-  announcementActive: z.boolean(),
-  showCollections: z.boolean(),
-  announcementText: optionalText(200),
-  announcementHref: hrefSchema,
-  translations: z.object({ km: z.record(z.string(), z.string().max(5000)).default({}) }).default({ km: {} }),
-  homepageSections: z.array(z.object({ key: z.enum(SECTION_KEYS), enabled: z.boolean() })).max(20),
-  socialGallery: z.array(z.object({ imageUrl: imageUrlSchema, href: hrefSchema })).max(12),
-});
+export const settingsInputSchema = z
+  .object({
+    storeName: z.string().trim().min(1).max(60),
+    tagline: optionalText(160),
+    logoUrl: optionalImageUrl,
+    faviconUrl: optionalImageUrl,
+    currency: z.enum(["USD", "KHR"]),
+    defaultLocale: z.enum(["en", "km"]),
+    khrExchangeRate: optionalMoney,
+    showKhrEquivalent: z.boolean(),
+    telegramUsername: z
+      .union([z.string().trim().max(64), z.null()])
+      .optional()
+      .transform((v) =>
+        v ? v.replace(/^@/, "").replace(/^https?:\/\/t\.me\//i, "") : null,
+      )
+      .refine(
+        (v) => v === null || /^[A-Za-z0-9_]{5,32}$/.test(v),
+        "Telegram usernames are 5–32 letters, numbers or _",
+      ),
+    messengerUrl: z
+      .union([z.string().trim().max(300), z.null()])
+      .optional()
+      .transform((v) => (v ? v : null))
+      .refine(
+        (v) =>
+          v === null ||
+          /^https:\/\/(www\.)?(m\.me|messenger\.com|facebook\.com|m\.facebook\.com)\//.test(
+            v,
+          ),
+        "Use an https://m.me/… link",
+      ),
+    whatsappNumber: z
+      .union([z.string().trim().max(30), z.null()])
+      .optional()
+      .transform((v) => (v ? v.replace(/\D/g, "") : null))
+      .refine(
+        (v) => v === null || (v.length >= 8 && v.length <= 15),
+        "International format without +, e.g. 85512345678",
+      ),
+    defaultChannel: z.enum(["TELEGRAM", "WHATSAPP", "MESSENGER"]),
+    minOrderAmount: optionalMoney,
+    taxEnabled: z.boolean(),
+    taxRate: moneyString.refine((v) => Number(v) <= 100, "Max 100%"),
+    taxLabel: z.string().trim().min(1).max(20),
+    reservationHours: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(24 * 30),
+    deductStockOn: z.enum(["CONFIRMED", "PAYMENT_RECEIVED", "SHIPPED"]),
+    lowStockThreshold: z.coerce.number().int().min(0).max(1000),
+    contactEmail: z
+      .union([z.string().trim().email(), z.literal(""), z.null()])
+      .optional()
+      .transform((v) => (v ? v : null)),
+    contactPhone: optionalText(40),
+    address: optionalText(300),
+    socialLinks: z.object({
+      instagram: hrefSchema,
+      facebook: hrefSchema,
+      tiktok: hrefSchema,
+      telegram: hrefSchema,
+      youtube: hrefSchema,
+    }),
+    footerText: optionalText(500),
+    shippingInfo: optionalText(5000),
+    sizeGuide: optionalText(5000),
+    announcementActive: z.boolean(),
+    showCollections: z.boolean(),
+    announcementText: optionalText(200),
+    announcementHref: hrefSchema,
+    translations: z
+      .object({ km: z.record(z.string(), z.string().max(5000)).default({}) })
+      .default({ km: {} }),
+    homepageSections: z
+      .array(z.object({ key: z.enum(SECTION_KEYS), enabled: z.boolean() }))
+      .max(20),
+    socialGallery: z
+      .array(z.object({ imageUrl: imageUrlSchema, href: hrefSchema }))
+      .max(12),
+  })
+  .superRefine((s, ctx) => {
+    const configured = {
+      TELEGRAM: s.telegramUsername,
+      MESSENGER: s.messengerUrl,
+      WHATSAPP: s.whatsappNumber,
+    };
+    const anySet = Object.values(configured).some(Boolean);
+    if (anySet && !configured[s.defaultChannel]) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["defaultChannel"],
+        message:
+          "The default channel has no account set. Choose Telegram or Messenger, or fill in that channel.",
+      });
+    }
+  });
 
 /** Quick edit from the product list: the fields a seller changes most, nothing structural. */
 export const productQuickEditSchema = z
@@ -371,13 +555,28 @@ export const productQuickEditSchema = z
     isNewArrival: z.boolean(),
     isBestSeller: z.boolean(),
     variants: z
-      .array(z.object({ id: z.string().uuid(), stock: z.coerce.number().int().min(0).max(1_000_000), isActive: z.boolean() }))
+      .array(
+        z.object({
+          id: z.string().uuid(),
+          stock: z.coerce.number().int().min(0).max(1_000_000),
+          isActive: z.boolean(),
+        }),
+      )
       .max(300),
   })
   .superRefine((p, ctx) => {
-    if (Number(p.price) <= 0) ctx.addIssue({ code: "custom", path: ["price"], message: "Price must be greater than 0" });
+    if (Number(p.price) <= 0)
+      ctx.addIssue({
+        code: "custom",
+        path: ["price"],
+        message: "Price must be greater than 0",
+      });
     if (p.salePrice !== null && Number(p.salePrice) >= Number(p.price)) {
-      ctx.addIssue({ code: "custom", path: ["salePrice"], message: "Sale price must be lower than the regular price" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["salePrice"],
+        message: "Sale price must be lower than the regular price",
+      });
     }
   });
 export type ProductQuickEditInput = z.infer<typeof productQuickEditSchema>;

@@ -56,7 +56,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
               {c.addresses.map((a) => (
                 <p key={a.id} className="mb-2 text-xs">
                   {a.label && <span className="font-medium">{a.label}: </span>}
-                  {[a.addressLine, a.commune, a.district, a.province].join(", ")}
+                  {[a.addressLine, a.commune, a.district, a.province].filter(Boolean).join(", ")}
                 </p>
               ))}
             </div>

@@ -172,7 +172,7 @@ export default async function AdminOrderPage({ params }: PageProps<"/admin/order
             <Card>
               <h2 className="mb-3 text-sm font-semibold">Delivery</h2>
               <p className="text-sm">{order.addressLine}</p>
-              <p className="text-sm text-muted-foreground">{[order.commune, order.district, order.province].join(", ")}</p>
+              {[order.commune, order.district, order.province].some(Boolean) && <p className="text-sm text-muted-foreground">{[order.commune, order.district, order.province].filter(Boolean).join(", ")}</p>}
               <p className="mt-2 text-sm">{order.deliveryMethodName}</p>
               {order.deliveryNotes && <p className="mt-2 text-xs text-muted-foreground">Note: {order.deliveryNotes}</p>}
               {order.trackingNumber && <p className="mt-2 text-xs">Tracking: {order.trackingNumber}</p>}

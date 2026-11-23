@@ -75,7 +75,7 @@ export function OrderMessaging({
     if (!win) window.location.assign(link);
   }
 
-  const order: Channel[] = [preferred, ...(["TELEGRAM", "WHATSAPP", "MESSENGER"] as Channel[]).filter((c) => c !== preferred)];
+  const order: Channel[] = [preferred, ...(["TELEGRAM", "MESSENGER", "WHATSAPP"] as Channel[]).filter((c) => c !== preferred)];
   const available = order.filter((c) => links[c]);
 
   return (

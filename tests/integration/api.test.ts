@@ -120,3 +120,23 @@ describe("admin authorization", () => {
     expect(await prisma.adminActivityLog.count({ where: { action: "order.status" } })).toBe(1);
   });
 });
+
+describe("order messaging settings", () => {
+  const save = async (patch: Record<string, unknown>) => {
+    const { getStoreSettings } = await import("@/services/settings");
+    const current = await getStoreSettings();
+    return adminSettings(req("/api/admin/settings", { method: "PUT", body: JSON.stringify({ ...current, ...patch }), cookie: adminCookie }), ctx({}));
+  };
+
+  it("works with Telegram and Messenger only — WhatsApp is optional", async () => {
+    const res = await save({ telegramUsername: "dany_shop", messengerUrl: "https://m.me/danyshop", whatsappNumber: null, defaultChannel: "TELEGRAM" });
+    expect(res.status).toBe(200);
+    expect(await prisma.storeSettings.findUniqueOrThrow({ where: { id: "default" } })).toMatchObject({ whatsappNumber: null, messengerUrl: "https://m.me/danyshop" });
+  });
+
+  it("rejects a default channel that has no account", async () => {
+    const res = await save({ telegramUsername: null, messengerUrl: "https://m.me/danyshop", whatsappNumber: null, defaultChannel: "WHATSAPP" });
+    expect(res.status).toBe(400);
+    expect((await body(res)).error?.code).toBe("VALIDATION_ERROR");
+  });
+});

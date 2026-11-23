@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { AnimatePresence } from "framer-motion";
-import { ShoppingBag } from "lucide-react";
+import { Loader2, ShoppingBag } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { AnimatedMoney } from "@/components/shared/price";
 import { useCart } from "@/features/cart/cart-provider";
 import { useMoney } from "@/features/store/store-provider";
@@ -55,23 +56,34 @@ export function CartDrawer() {
               <p className="text-xs text-muted-foreground">
                 {t("cart.delivery")}: {t("cart.deliveryCalculated")}
               </p>
-              <Button size="xl" className="w-full" asChild onClick={cart.closeDrawer}>
-                <Link href="/checkout" data-testid="drawer-checkout">
-                  {t("cart.checkout")}
-                </Link>
-              </Button>
-              <div className="grid grid-cols-2 gap-2">
-                <Button size="xl" variant="outline" asChild onClick={cart.closeDrawer}>
-                  <Link href="/cart">{t("cart.viewCart")}</Link>
-                </Button>
-                <Button size="xl" variant="ghost" onClick={cart.closeDrawer}>
-                  {t("cart.continueShopping")}
-                </Button>
-              </div>
+              <Link href="/checkout" data-testid="drawer-checkout" className={cn(buttonVariants({ size: "xl" }), "w-full")}>
+                <PendingLabel>{t("cart.checkout")}</PendingLabel>
+              </Link>
+              <Link href="/cart" className={cn(buttonVariants({ size: "xl", variant: "outline" }), "w-full")}>
+                <PendingLabel>{t("cart.viewCart")}</PendingLabel>
+              </Link>
+              <button
+                type="button"
+                onClick={cart.closeDrawer}
+                className="block w-full py-1.5 text-center text-xs font-medium tracking-[0.14em] uppercase underline-offset-4 hover:underline"
+              >
+                {t("cart.continueShopping")}
+              </button>
             </div>
           </>
         )}
       </SheetContent>
     </Sheet>
+  );
+}
+
+/** Link label with a spinner while the target page loads (the tap always gets visible feedback). */
+function PendingLabel({ children }: { children: React.ReactNode }) {
+  const { pending } = useLinkStatus();
+  return (
+    <span className="inline-flex items-center gap-2" aria-busy={pending}>
+      <Loader2 className={cn("size-4 animate-spin", !pending && "hidden")} aria-hidden />
+      {children}
+    </span>
   );
 }

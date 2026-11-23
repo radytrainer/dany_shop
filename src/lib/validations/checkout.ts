@@ -31,9 +31,10 @@ export const checkoutCustomerSchema = z.object({
   phone: phoneSchema,
   telegramUsername: telegramSchema,
   email: optionalEmailSchema,
-  province: required(100),
-  district: required(100),
-  commune: required(100),
+  // Only the address line is asked for; these stay optional for older saved addresses.
+  province: z.string().trim().max(100).optional().transform((v) => v ?? ""),
+  district: z.string().trim().max(100).optional().transform((v) => v ?? ""),
+  commune: z.string().trim().max(100).optional().transform((v) => v ?? ""),
   addressLine: required(300),
   deliveryNotes: z.string().trim().max(500, "validation.invalid").optional().transform((v) => (v ? v : undefined)),
 });

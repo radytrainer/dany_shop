@@ -55,7 +55,7 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
               </div>
               <p className="mt-2">{a.fullName}</p>
               <p className="text-muted-foreground">{a.phone}</p>
-              <p className="text-muted-foreground">{[a.addressLine, a.commune, a.district, a.province].join(", ")}</p>
+              <p className="text-muted-foreground">{[a.addressLine, a.commune, a.district, a.province].filter(Boolean).join(", ")}</p>
               <div className="mt-4 flex gap-4 text-xs">
                 <button type="button" className="underline underline-offset-4" onClick={() => setEditing(a)}>
                   {t("common.edit")}
@@ -114,9 +114,6 @@ function AddressDialog({ address, onClose, onSaved }: { address: Address | null;
           <TextField label={t("checkout.fullName")} error={e.fullName?.message} {...form.register("fullName")} />
           <TextField label={t("checkout.phone")} type="tel" error={e.phone?.message} {...form.register("phone")} />
           <TextField label={t("checkout.address")} error={e.addressLine?.message} {...form.register("addressLine")} className="sm:col-span-2" />
-          <TextField label={t("checkout.province")} error={e.province?.message} {...form.register("province")} />
-          <TextField label={t("checkout.district")} error={e.district?.message} {...form.register("district")} />
-          <TextField label={t("checkout.commune")} error={e.commune?.message} {...form.register("commune")} className="sm:col-span-2" />
           <TextAreaField label={t("checkout.notes")} optional error={e.notes?.message} {...form.register("notes")} className="sm:col-span-2" />
           <div className="flex gap-2 sm:col-span-2">
             <Button type="submit" size="xl" disabled={form.formState.isSubmitting}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { api } from "@/lib/fetcher";
 import { computeSubtotal } from "@/lib/calculations/pricing";
@@ -64,6 +65,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [quoting, setQuoting] = useState(false);
   const [deliveryMethodId, setDeliveryMethodId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Links inside the bag drawer do not close it when tapped: closing (animation + scroll lock)
+  // at the same moment as navigating made taps on phones sometimes do nothing. The drawer stays
+  // open, showing the link's loading state, and closes here once the new page has arrived.
+  const pathname = usePathname();
+  const [drawerPath, setDrawerPath] = useState(pathname);
+  if (pathname !== drawerPath) {
+    setDrawerPath(pathname);
+    if (drawerOpen) setDrawerOpen(false);
+  }
   const syncedUserRef = useRef<string | null | undefined>(undefined);
   const quoteSeq = useRef(0);
 

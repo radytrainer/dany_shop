@@ -152,22 +152,24 @@ export function SettingsForm({ initial }: { initial: StoreSettingsDTO }) {
 
       <Card>
         <h2 className="mb-1 text-sm font-semibold">Order messaging</h2>
-        <p className="mb-4 text-xs text-muted-foreground">Customers send their saved order to you through these channels. Leave a channel empty to hide it.</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Customers send their saved order to you through these apps. Set at least one; leave an app empty to hide it at checkout.
+        </p>
         <div className="grid gap-3">
           <Field label="Telegram username" hint="Without @ — e.g. danyshop">
             <input value={s.telegramUsername} onChange={(e) => set("telegramUsername", e.target.value)} className={inputCls} />
           </Field>
-          <Field label="WhatsApp number" hint="International format, digits only — e.g. 85512345678">
-            <input value={s.whatsappNumber} onChange={(e) => set("whatsappNumber", e.target.value)} inputMode="tel" className={inputCls} />
-          </Field>
           <Field label="Facebook Messenger link" hint="e.g. https://m.me/yourpage">
             <input value={s.messengerUrl} onChange={(e) => set("messengerUrl", e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="WhatsApp number (optional)" hint="Leave empty to hide WhatsApp. International format, digits only — e.g. 85512345678">
+            <input value={s.whatsappNumber} onChange={(e) => set("whatsappNumber", e.target.value)} inputMode="tel" className={inputCls} />
           </Field>
           <Field label="Default channel">
             <select value={s.defaultChannel} onChange={(e) => set("defaultChannel", e.target.value as typeof s.defaultChannel)} className={inputCls}>
               <option value="TELEGRAM">Telegram</option>
-              <option value="WHATSAPP">WhatsApp</option>
               <option value="MESSENGER">Messenger</option>
+              <option value="WHATSAPP">WhatsApp</option>
             </select>
           </Field>
         </div>

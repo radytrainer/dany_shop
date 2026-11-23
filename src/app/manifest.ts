@@ -10,7 +10,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "DANY — Fashion, Siem Reap",
     short_name: "DANY",
-    description: "Shop new and pre-loved fashion from Siem Reap. Order via Telegram or WhatsApp.",
+    description: "Shop new and pre-loved fashion from Siem Reap. Order via Telegram or Messenger.",
     lang: "en",
     start_url: "/?source=pwa",
     scope: "/",

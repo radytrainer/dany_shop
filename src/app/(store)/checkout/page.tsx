@@ -39,10 +39,11 @@ export default async function CheckoutPage() {
     }));
   }
 
+  // Order matters: Telegram and Messenger are what most shoppers in Cambodia use; WhatsApp is optional.
   const channels = {
     TELEGRAM: !!normalizeTelegramUsername(settings.telegramUsername),
-    WHATSAPP: !!normalizeWhatsappNumber(settings.whatsappNumber),
     MESSENGER: !!messengerLink(settings.messengerUrl),
+    WHATSAPP: !!normalizeWhatsappNumber(settings.whatsappNumber),
   };
 
   return (

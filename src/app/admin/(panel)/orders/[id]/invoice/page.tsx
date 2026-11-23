@@ -43,7 +43,7 @@ export default async function InvoicePage({ params }: PageProps<"/admin/orders/[
           <p>{order.phone}</p>
           {order.email && <p>{order.email}</p>}
           <p className="mt-1">{order.addressLine}</p>
-          <p>{[order.commune, order.district, order.province].join(", ")}</p>
+          {[order.commune, order.district, order.province].some(Boolean) && <p>{[order.commune, order.district, order.province].filter(Boolean).join(", ")}</p>}
         </div>
         <div>
           <p className="text-xs font-semibold uppercase">Delivery</p>

@@ -137,7 +137,7 @@ export default async function OrderPage({ params, searchParams }: PageProps<"/or
             <p className="text-xs font-semibold tracking-wider uppercase">{t("order.deliveryTo")}</p>
             <p>{order.customerName}</p>
             <p className="text-muted-foreground">{order.phone}</p>
-            <p className="text-muted-foreground">{[order.addressLine, order.commune, order.district, order.province].join(", ")}</p>
+            <p className="text-muted-foreground">{[order.addressLine, order.commune, order.district, order.province].filter(Boolean).join(", ")}</p>
             <p className="text-muted-foreground">{order.deliveryMethodName}</p>
             {order.trackingNumber && (
               <p className="pt-2">

@@ -92,9 +92,8 @@ test("customer journey and admin fulfilment", async ({ page, isMobile }) => {
   await page.fill("#phone", "012 999 888");
   await page.fill("#telegramUsername", "e2e_customer");
   await page.fill("#addressLine", "No. 7, Street 51");
-  await page.fill("#province", "Siem Reap");
-  await page.fill("#district", "Daun Penh");
-  await page.fill("#commune", "Phsar Thmei");
+  // Delivery address is just the address line (+ optional notes).
+  await expect(page.locator("#province, #district, #commune")).toHaveCount(0);
   await page.getByTestId("delivery-option").first().click();
   await expect(page.getByTestId("delivery")).toContainText("$1.50");
   await expect(page.getByTestId("grand-total")).toContainText("$28.50");
@@ -104,11 +103,11 @@ test("customer journey and admin fulfilment", async ({ page, isMobile }) => {
   // 14. Saved in PostgreSQL
   await page.waitForURL(/\/orders\/ORD-\d{4}-\d{5}/);
   const orderNumber = (await page.getByTestId("order-number").innerText()).trim();
-  const [row] = await query<{ status: string; grandTotal: string; couponCode: string; customerName: string }>(
-    `SELECT status, "grandTotal"::text AS "grandTotal", "couponCode", "customerName" FROM "Order" WHERE "orderNumber" = $1`,
+  const [row] = await query<{ status: string; grandTotal: string; couponCode: string; customerName: string; addressLine: string; province: string }>(
+    `SELECT status, "grandTotal"::text AS "grandTotal", "couponCode", "customerName", "addressLine", province FROM "Order" WHERE "orderNumber" = $1`,
     [orderNumber],
   );
-  expect(row).toMatchObject({ status: "PENDING", couponCode: "WELCOME10", customerName: "E2E Customer" });
+  expect(row).toMatchObject({ status: "PENDING", couponCode: "WELCOME10", customerName: "E2E Customer", addressLine: "No. 7, Street 51", province: "" });
   expect(money(row.grandTotal)).toBe(28.5);
 
   // Receipt PDF downloads from the confirmation page
