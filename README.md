@@ -17,7 +17,7 @@ Customers browse, choose size and colour, build a cart and place an order **with
 5. [Architecture](#architecture)
 6. [Order, payment and inventory flow](#order-payment-and-inventory-flow)
 7. [Testing](#testing)
-8. [Deployment (OVHcloud VPS)](#deployment-ovhcloud-vps)
+8. [Deployment (AWS EC2)](#deployment-aws-ec2)
 9. [Backups and restore](#backups-and-restore)
 10. [Security](#security)
 11. [Known limitations and next steps](#known-limitations-and-next-steps)
@@ -226,9 +226,9 @@ End-to-end tests expect a seeded database (`npm run db:seed`) and reuse a runnin
 
 ---
 
-## Deployment (OVHcloud VPS)
+## Deployment (AWS EC2)
 
-The production stack runs on Docker Compose (`--profile prod`) and has these services:
+Production: **https://dany-meas.store** on EC2 `3.27.91.153` (ap-southeast-2, Sydney). The production stack runs on Docker Compose (`--profile prod`) and has these services:
 
 | Service | Role |
 | --- | --- |
@@ -240,66 +240,81 @@ The production stack runs on Docker Compose (`--profile prod`) and has these ser
 | `scheduler` | Releases expired stock reservations every 15 minutes |
 | `backup` | Nightly `pg_dump` plus an uploads archive, with rotation |
 
-**1. Server preparation** (Ubuntu 24.04 VPS):
+Everything AWS-specific lives in [`deploy/aws/`](deploy/aws/):
+
+| File | Where it runs | What it does |
+| --- | --- | --- |
+| `bootstrap-ec2.sh` | server, once | Docker, swap (the build needs it), log rotation, security updates, cron jobs |
+| `push.sh` | your computer | Uploads the project over SSH (no git remote needed), optionally deploys |
+| `deploy.sh` | server | Checks `.env`, builds, migrates, issues HTTPS on first run, verifies health |
+| `env.production.example` | server | `.env` template, pre-filled for `dany-meas.store` |
+| `backup-to-s3.sh` + `iam-backup-policy.json` | server (cron) | Optional off-server copies of backups to S3 |
+
+### 1. AWS console (once)
+
+1. **Instance:** Ubuntu 24.04 LTS, **t3.small or larger** (2 GB RAM; with the swap from step 3 the image builds fine), 30 GB gp3 disk.
+2. **Elastic IP:** make sure `3.27.91.153` is an *Elastic IP* associated with the instance. A plain auto-assigned public IP changes when the instance stops, and the site would go offline.
+3. **Security group, inbound:** `22` from *your IP only*, `80` and `443` from `0.0.0.0/0` (and `::/0`). Postgres is never exposed.
+4. **DNS** at your domain registrar: `A` record `dany-meas.store` → `3.27.91.153`, and `A` record `www` → `3.27.91.153`. Check with `nslookup dany-meas.store` before step 5; HTTPS cannot be issued until it resolves.
+5. Optional: an S3 bucket for backups, plus an IAM role for the instance using `deploy/aws/iam-backup-policy.json` (replace the bucket name). Add a lifecycle rule to the bucket to expire old backups, for example after 90 days.
+
+### 2. Upload the code (from your computer)
+
+In Git Bash, from the project root:
 
 ```bash
-sudo apt update && sudo apt -y upgrade
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER && newgrp docker
-sudo ufw allow OpenSSH && sudo ufw allow 80 && sudo ufw allow 443 && sudo ufw enable
+EC2_KEY=~/.ssh/dany-shop.pem ./deploy/aws/push.sh
 ```
 
-Point the domain's DNS `A` (and `AAAA`) records for `example.com` and `www.example.com` at the VPS.
+The upload excludes `.env`, `node_modules`, build output, uploads and backups. It never overwrites the server's `.env` or `backups/`.
 
-### 2. Configure
+### 3. Prepare the server (once)
+
 ```bash
-git clone <your-repo> dany-shop && cd dany-shop
-cp .env.example .env
-# Edit .env:
-#   NODE_ENV=production
-#   APP_URL=https://example.com      DOMAIN=example.com
-#   POSTGRES_PASSWORD=<openssl rand -hex 24>   (hex keeps the connection URL safe)
-#   SESSION_SECRET=<openssl rand -hex 32>      CRON_SECRET=<openssl rand -hex 24>
-#   SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD     (change the password after first login)
-#   STORAGE_DRIVER=local  (or cloudinary + CLOUDINARY_*)
-#   TRUST_PROXY=true      SEED_DEMO=false
+ssh -i ~/.ssh/dany-shop.pem ubuntu@3.27.91.153
+bash /opt/dany-shop/deploy/aws/bootstrap-ec2.sh
+exit        # log in again so the docker group applies
 ```
 
-### 3. Build, migrate, start
+### 4. Configure
+
 ```bash
-docker compose --profile prod build
-docker compose --profile prod up -d db migrate app scheduler backup
-docker compose --profile prod logs -f migrate      # wait for "Seed complete."
+ssh -i ~/.ssh/dany-shop.pem ubuntu@3.27.91.153
+cd /opt/dany-shop
+cp deploy/aws/env.production.example .env
+openssl rand -hex 24; openssl rand -hex 32; openssl rand -hex 24    # POSTGRES_PASSWORD, SESSION_SECRET, CRON_SECRET
+nano .env      # also LETSENCRYPT_EMAIL, SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
+chmod 600 .env
 ```
 
-### 4. HTTPS (first time only)
+### 5. Deploy
+
 ```bash
-chmod +x deploy/init-letsencrypt.sh deploy/backup/*.sh
-DOMAIN=example.com EMAIL=you@example.com ./deploy/init-letsencrypt.sh
-docker compose --profile prod up -d               # starts nginx + certbot
+bash deploy/aws/deploy.sh
 ```
 
-### 5. After go-live
-- Sign in at `/admin`, change the admin password, and set the Telegram, WhatsApp and Messenger accounts in **Settings**.
-- Add categories, products and banners. The demo catalogue is never seeded in production.
+On the first run this builds the images, migrates, seeds the reference data (categories, Siem Reap delivery methods, settings and the admin account; never the demo catalogue), obtains the Let's Encrypt certificate and starts everything. It stops with a clear message if `.env` is incomplete or DNS does not point at the server yet. In that case, fix the problem and run it again.
 
-### 6. Smoke test
-```bash
-curl -I https://example.com
-curl -s https://example.com/api/store-settings | head -c 200
-docker compose --profile prod ps                   # app should be "healthy"
-```
+### 6. After go-live
 
-Then place a test order on your phone, open it in the admin and cancel it.
+- Sign in at `https://dany-meas.store/admin` and change the admin password. Set the Telegram, WhatsApp and Messenger accounts in **Settings**.
+- Add products: the full editor is under **Products → New product**. Use **Quick edit** on the product list for price, sale, status, flags and stock.
+- Place a test order on your phone, download the receipt PDF, then cancel the order in the admin.
 
 ### Updating
+
+From your computer, upload and redeploy in one step (migrations run before the new app starts):
+
 ```bash
-git pull
-docker compose --profile prod build app migrate
-docker compose --profile prod up -d migrate app    # migrations run before the new app starts
+EC2_KEY=~/.ssh/dany-shop.pem ./deploy/aws/push.sh --deploy
 ```
 
-**Renewed certificates:** `certbot` renews automatically. To load renewed certificates, reload Nginx after renewal, for example with a weekly host cron job: `docker compose --profile prod exec nginx nginx -s reload`.
+**Useful commands on the server**, run from `/opt/dany-shop`:
+
+- `docker compose --profile prod ps` shows the service status.
+- `docker compose --profile prod logs -f --tail=100 app` follows the app logs.
+
+**Certificates:** `certbot` renews them automatically, and a weekly cron job installed by `bootstrap-ec2.sh` reloads Nginx to pick them up.
 
 ---
 
@@ -310,7 +325,7 @@ The `backup` service writes to `./backups/` on the host:
 - `db-YYYYMMDD-HHMMSS.dump`: a compressed `pg_dump` in custom format.
 - `uploads-YYYYMMDD-HHMMSS.tar.gz`: uploaded images, when the local driver is used.
 
-It runs once on start and then daily at `BACKUP_HOUR`, and deletes files older than `BACKUP_KEEP_DAYS`. **Copy `./backups` off the server** with your own tool, such as OVH Object Storage, `rclone` or `restic`. Backups that stay on the same VPS do not protect you against losing that server.
+It runs once on start and then daily at `BACKUP_HOUR`, and deletes files older than `BACKUP_KEEP_DAYS`. **Copy `./backups` off the server** with your own tool, such as `deploy/aws/backup-to-s3.sh` (S3), `rclone` or `restic`. Backups that stay on the same VPS do not protect you against losing that server.
 
 **Restore** (this stops the app, replaces the database and optionally the images, then restarts):
 

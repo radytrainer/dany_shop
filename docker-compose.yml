@@ -4,6 +4,9 @@
 # Full procedure, TLS bootstrap, backups & restore: see README.md → "Deployment".
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Fixed project name: volume names (database, uploads, certificates) never depend on the folder name.
+name: dany_shop
+
 x-app-env: &app-env
   NODE_ENV: production
   DATABASE_URL: postgresql://${POSTGRES_USER:-dany}:${POSTGRES_PASSWORD:-dany_dev_password}@db:5432/${POSTGRES_DB:-dany_shop}?schema=public

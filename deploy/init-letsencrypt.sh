@@ -8,6 +8,7 @@ set -eu
 DOMAIN=${DOMAIN:?set DOMAIN}
 EMAIL=${EMAIL:?set EMAIL (for expiry notices)}
 STAGING=${STAGING:-0}   # set STAGING=1 to test against the Let's Encrypt staging CA
+WWW=${WWW:-1}           # set WWW=0 when www.<domain> has no DNS record
 
 echo "→ Creating temporary certificate for $DOMAIN"
 docker compose --profile prod run --rm --entrypoint sh certbot -c "
@@ -23,13 +24,16 @@ echo "→ Removing temporary certificate"
 docker compose --profile prod run --rm --entrypoint sh certbot -c "
   rm -rf /etc/letsencrypt/live/$DOMAIN /etc/letsencrypt/archive/$DOMAIN /etc/letsencrypt/renewal/$DOMAIN.conf"
 
+WWW_ARG=""
+[ "$WWW" = "1" ] && WWW_ARG="-d www.$DOMAIN"
+
 STAGING_ARG=""
 [ "$STAGING" = "1" ] && STAGING_ARG="--staging"
 
 echo "→ Requesting Let's Encrypt certificate"
 docker compose --profile prod run --rm --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
   $STAGING_ARG --email "$EMAIL" --agree-tos --no-eff-email \
-  -d "$DOMAIN" -d "www.$DOMAIN" --rsa-key-size 4096 --force-renewal
+  -d "$DOMAIN" $WWW_ARG --rsa-key-size 4096 --force-renewal
 
 echo "→ Reloading nginx"
 docker compose --profile prod exec nginx nginx -s reload
