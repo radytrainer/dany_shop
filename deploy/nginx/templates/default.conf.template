@@ -1,0 +1,79 @@
+# Rendered by the nginx image with envsubst (${DOMAIN}). TLS certificates come from Let's Encrypt
+# (see deploy/init-letsencrypt.sh for the first issuance).
+
+upstream dany_app {
+    server app:3000;
+    keepalive 32;
+}
+
+limit_req_zone $binary_remote_addr zone=api_writes:10m rate=10r/s;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN} www.${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://${DOMAIN}$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name ${DOMAIN} www.${DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+
+    client_max_body_size 12m;
+    server_tokens off;
+
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+    gzip_min_length 1024;
+
+    # www → apex
+    if ($host = www.${DOMAIN}) {
+        return 301 https://${DOMAIN}$request_uri;
+    }
+
+    # Uploaded product images served straight from the shared volume.
+    location /uploads/ {
+        alias /srv/uploads/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options nosniff;
+        types { image/jpeg jpg jpeg; image/png png; image/webp webp; image/avif avif; }
+        default_type application/octet-stream;
+        try_files $uri =404;
+    }
+
+    location /_next/static/ {
+        proxy_pass http://dany_app;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /api/ {
+        limit_req zone=api_writes burst=40 nodelay;
+        proxy_pass http://dany_app;
+        include /etc/nginx/conf.d/proxy_headers.inc;
+    }
+
+    location / {
+        proxy_pass http://dany_app;
+        include /etc/nginx/conf.d/proxy_headers.inc;
+    }
+}

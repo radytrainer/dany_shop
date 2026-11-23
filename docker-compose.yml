@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Development:  docker compose up -d db            (Postgres only; run `npm run dev` on the host)
+# Production:   docker compose --profile prod up -d --build
+# Full procedure, TLS bootstrap, backups & restore: see README.md → "Deployment".
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://${POSTGRES_USER:-dany}:${POSTGRES_PASSWORD:-dany_dev_password}@db:5432/${POSTGRES_DB:-dany_shop}?schema=public
+  TRUST_PROXY: "true"
+  UPLOAD_DIR: /app/storage/uploads
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dany}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dany_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-dany_shop}
+    ports:
+      # Localhost only — never expose Postgres publicly. Use an SSH tunnel for remote admin.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dany} -d ${POSTGRES_DB:-dany_shop}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-off job: apply migrations and seed reference data (never demo products in production).
+  migrate:
+    profiles: ["prod"]
+    build: { context: ., target: builder }
+    env_file: .env
+    environment:
+      <<: *app-env
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed"
+    depends_on:
+      db: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    profiles: ["prod"]
+    build: { context: ., target: runner }
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      <<: *app-env
+    volumes:
+      - uploads:/app/storage/uploads
+    depends_on:
+      db: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    expose:
+      - "3000"
+
+  nginx:
+    profiles: ["prod"]
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
+      - certbot-www:/var/www/certbot:ro
+      - certbot-certs:/etc/letsencrypt:ro
+      - uploads:/srv/uploads:ro
+    depends_on:
+      - app
+
+  certbot:
+    profiles: ["prod"]
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - certbot-www:/var/www/certbot
+      - certbot-certs:/etc/letsencrypt
+    # Renew twice a day; nginx picks up renewed certs on its periodic reload (see nginx service docs).
+    entrypoint:
+      - sh
+      - -c
+      - "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+
+  # Releases stock held by unconfirmed orders once their reservation window expires.
+  scheduler:
+    profiles: ["prod"]
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    env_file: .env
+    entrypoint:
+      - sh
+      - -c
+      - 'sleep 60; while :; do curl -fsS -X POST -H "Authorization: Bearer $$CRON_SECRET" http://app:3000/api/cron/release-reservations || true; sleep 900; done'
+    depends_on:
+      - app
+
+  # Nightly database + uploads backups with rotation (see deploy/backup/*.sh).
+  backup:
+    profiles: ["prod"]
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-dany}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-dany_dev_password}
+      PGDATABASE: ${POSTGRES_DB:-dany_shop}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_HOUR: ${BACKUP_HOUR:-3}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup:/scripts:ro
+      - uploads:/uploads:ro
+    entrypoint: ["sh", "/scripts/backup-loop.sh"]
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  uploads:
+  certbot-www:
+  certbot-certs:

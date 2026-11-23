@@ -1,0 +1,18 @@
+# Never send secrets or local state to the Docker build context
+.env
+.env.*
+!.env.example
+node_modules
+.next
+.git
+storage
+backups
+graphify-out
+playwright-report
+test-results
+coverage
+.agents
+.claude
+.windsurf
+*.log
+src/generated
