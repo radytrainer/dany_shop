@@ -40,6 +40,9 @@ test("customer journey and admin fulfilment", async ({ page, isMobile }) => {
   await page.getByTestId("add-to-cart").first().click();
   await expect(page.getByText("Please choose a size.")).toBeVisible();
   await expect(page.getByText("Please choose a color.")).toBeVisible();
+  // Tooltip next to the tapped button (visible even when the pickers are off screen on phones)
+  await expect(page.getByTestId("selection-hint")).toHaveText("Please choose a color and size.");
+  await expect(page.getByTestId("cart-drawer")).toBeHidden();
 
   // 4–6. Select colour + size, add to cart
   await chooseFirstAvailable(page);

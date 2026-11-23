@@ -12,6 +12,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SiteFooter } from "@/components/layout/site-footer";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { InstallBanner, ServiceWorkerRegistrar } from "@/features/pwa/pwa";
 import type { HeaderNav } from "@/components/layout/nav-types";
 
 export default async function StoreLayout({ children }: LayoutProps<"/">) {
@@ -79,6 +80,8 @@ export default async function StoreLayout({ children }: LayoutProps<"/">) {
             <SiteFooter settings={settings} footerText={localizedSetting(settings, "footerText", locale)} address={localizedSetting(settings, "address", locale)} groups={nav.groups} showCollections={settings.showCollections} t={t} />
             <BottomNav />
             <CartDrawer />
+            <InstallBanner />
+            <ServiceWorkerRegistrar />
           </WishlistProvider>
         </CartProvider>
       </StoreProvider>

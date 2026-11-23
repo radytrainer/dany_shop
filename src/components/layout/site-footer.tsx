@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Send } from "lucide-react";
+import { InstallAppButton } from "@/features/pwa/pwa";
 import { FacebookIcon, InstagramIcon, TikTokIcon, YoutubeIcon } from "@/components/shared/brand-icons";
 import { NewsletterForm } from "@/components/home/newsletter-form";
 import { LanguageSwitcher } from "./language-switcher";
@@ -94,6 +95,9 @@ export function SiteFooter({
                 <Link href="/account/orders" className="hover:underline">
                   {t("footer.trackOrder")}
                 </Link>
+              </li>
+              <li>
+                <InstallAppButton className="hover:underline" />
               </li>
             </ul>
           </div>

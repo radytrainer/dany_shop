@@ -8,7 +8,8 @@ function createClient() {
   const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
     adapter,
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    // PRISMA_LOG_QUERIES=true prints every SQL query (for profiling how many queries a page makes).
+    log: process.env.PRISMA_LOG_QUERIES === "true" ? ["query", "warn", "error"] : process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 }
 

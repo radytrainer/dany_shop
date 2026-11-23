@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { storefrontCache } from "@/lib/shared-cache";
 import { toCents } from "@/lib/money";
 import type { Locale } from "@/i18n/config";
 import { pickTranslation } from "./content";
@@ -15,7 +16,9 @@ export type DeliveryMethodDTO = {
   isPickup: boolean;
 };
 
-export const getDeliveryMethods = cache(async (locale: Locale): Promise<DeliveryMethodDTO[]> => {
+export const getDeliveryMethods = cache((locale: Locale) => loadDeliveryMethods(locale));
+
+const loadDeliveryMethods = storefrontCache(async (locale: Locale): Promise<DeliveryMethodDTO[]> => {
   const rows = await prisma.deliveryMethod.findMany({ where: { isActive: true }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
   return rows.map((d) => {
     const tr = pickTranslation({ name: d.name, description: d.description, estimatedDays: d.estimatedDays }, d.translations, locale);
@@ -29,4 +32,4 @@ export const getDeliveryMethods = cache(async (locale: Locale): Promise<Delivery
       isPickup: d.isPickup,
     };
   });
-});
+}, "delivery-methods");

@@ -8,6 +8,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useI18n } from "@/i18n/client";
 import { useSessionUser } from "@/features/session/session-provider";
 import { LanguageSwitcher } from "./language-switcher";
+import { InstallAppButton } from "@/features/pwa/pwa";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import type { HeaderNav } from "./nav-types";
 
@@ -120,6 +121,7 @@ export function MobileMenu({
             </Link>
           </div>
           <LanguageSwitcher />
+          <InstallAppButton className="w-full justify-center border bg-background py-3 text-sm" />
         </div>
       </SheetContent>
     </Sheet>

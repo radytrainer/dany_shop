@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { storefrontCache } from "@/lib/shared-cache";
 import { Prisma } from "@/generated/prisma/client";
 import { computeUnitPrice, discountPercent, isWithinWindow, type PromotionRule } from "@/lib/calculations/pricing";
 import type { Locale } from "@/i18n/config";
@@ -24,29 +25,38 @@ export type PricingContext = {
   ancestors: Map<string, string[]>;
 };
 
+type CategoryRow = { id: string; parentId: string | null; isActive: boolean };
+
+/** All categories (id, parent, active) — shared by pricing and visibility. Cached across requests. */
+const loadCategoryRows = storefrontCache(
+  async (): Promise<CategoryRow[]> => prisma.category.findMany({ select: { id: true, parentId: true, isActive: true } }),
+  "category-rows",
+);
+
+/** Active promotions as plain rules (ISO dates). The time window is checked per request, not cached. */
+const loadActivePromotions = storefrontCache(async (): Promise<PromotionRule[]> => {
+  const promos = await prisma.promotion.findMany({
+    where: { isActive: true },
+    include: { categories: { select: { id: true } }, products: { select: { id: true } } },
+  });
+  return promos.map((p) => ({
+    id: p.id,
+    name: p.name,
+    type: p.type,
+    value: p.value.toFixed(2),
+    scope: p.scope,
+    categoryIds: p.categories.map((c) => c.id),
+    productIds: p.products.map((x) => x.id),
+    startsAt: p.startsAt?.toISOString() ?? null,
+    endsAt: p.endsAt?.toISOString() ?? null,
+    isActive: p.isActive,
+  }));
+}, "promotions");
+
 export const getPricingContext = cache(async (): Promise<PricingContext> => {
-  const [promos, cats] = await Promise.all([
-    prisma.promotion.findMany({
-      where: { isActive: true },
-      include: { categories: { select: { id: true } }, products: { select: { id: true } } },
-    }),
-    prisma.category.findMany({ select: { id: true, parentId: true } }),
-  ]);
+  const [promos, cats] = await Promise.all([loadActivePromotions(), loadCategoryRows()]);
   const now = new Date();
-  const promotions: PromotionRule[] = promos
-    .filter((p) => isWithinWindow(now, p.startsAt, p.endsAt))
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      type: p.type,
-      value: p.value.toFixed(2),
-      scope: p.scope,
-      categoryIds: p.categories.map((c) => c.id),
-      productIds: p.products.map((x) => x.id),
-      startsAt: p.startsAt,
-      endsAt: p.endsAt,
-      isActive: p.isActive,
-    }));
+  const promotions = promos.filter((p) => isWithinWindow(now, p.startsAt, p.endsAt));
   const parentOf = new Map(cats.map((c) => [c.id, c.parentId]));
   const ancestors = new Map<string, string[]>();
   for (const c of cats) {
@@ -86,7 +96,7 @@ export function priceFor(
  * and cannot be ordered. Re-activating the category brings them back.
  */
 export const getVisibleCategoryIds = cache(async (): Promise<string[]> => {
-  const cats = await prisma.category.findMany({ select: { id: true, parentId: true, isActive: true } });
+  const cats = await loadCategoryRows();
   const byId = new Map(cats.map((c) => [c.id, c]));
   const visible = (id: string) => {
     const seen = new Set<string>();
@@ -102,7 +112,9 @@ export const getVisibleCategoryIds = cache(async (): Promise<string[]> => {
   return cats.filter((c) => visible(c.id)).map((c) => c.id);
 });
 
-export const getCategoryTree = cache(async (locale: Locale): Promise<CategoryNode[]> => {
+export const getCategoryTree = cache((locale: Locale) => loadCategoryTree(locale));
+
+const loadCategoryTree = storefrontCache(async (locale: Locale): Promise<CategoryNode[]> => {
   const rows = await prisma.category.findMany({
     where: { isActive: true },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
@@ -129,7 +141,7 @@ export const getCategoryTree = cache(async (locale: Locale): Promise<CategoryNod
     else if (!n.parentId) roots.push(n);
   }
   return roots;
-});
+}, "category-tree");
 
 export function findCategory(tree: CategoryNode[], slug: string): { node: CategoryNode; path: CategoryNode[] } | null {
   for (const root of tree) {

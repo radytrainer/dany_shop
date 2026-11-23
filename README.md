@@ -211,6 +211,24 @@ Admin    ──► CONFIRMED → AWAITING_PAYMENT → PAYMENT_RECEIVED (manual, 
 
 ---
 
+## Performance and the installable app (PWA)
+
+**Server caching.** Store settings, the category tree, promotions, banners, collections and delivery methods are cached across requests (`src/lib/shared-cache.ts`, Next.js `unstable_cache`). Before, every page re-read all of them, which meant 19–39 database queries per page; it is now 10–26, and 0 for the bag. Every successful admin save clears this cache, so changes show on the next page load. Entries also expire after 5 minutes, which covers edits made outside the admin. Stock, prices at checkout and anything per-user are never cached. To profile queries, set `PRISMA_LOG_QUERIES=true` to log every query.
+
+**Images.** WebP only (AVIF takes about 50% longer to encode on a small server). Optimized images are kept for 30 days in the `next-cache` Docker volume, so they survive deploys.
+
+**Why Redis or WebSockets are not used.** The site runs as a single server, where Next's own cache does the same job as Redis without another service to run. WebSockets push live updates; they do not make pages load faster.
+
+**Server location matters most.** Every request makes several round trips between the phone and the server. Sydney (ap-southeast-2) is about 235 ms per round trip from Cambodia; Singapore (ap-southeast-1) is typically 30–50 ms.
+
+**Installable app (PWA).**
+- `src/app/manifest.ts` provides the name, the icons in `public/brand/pwa-*` and shortcuts.
+- `public/sw.js` is the service worker. It caches versioned JS/CSS and images on the phone, so repeat visits load almost nothing from the network. It never caches pages, `/api` or `/admin`. Without a connection it shows `public/offline.html`.
+- **Install prompt:** shoppers see a dismissible card. Android and Chrome get the native install dialog; iPhone users get step-by-step Safari instructions. There is also an "Install app" link in the menu and footer.
+- **Updating:** after changing caching rules, bump `VERSION` in `sw.js` so phones drop their old caches.
+
+---
+
 ## Testing
 
 ```bash

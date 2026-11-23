@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="robots" content="noindex" />
+    <title>Offline · DANY</title>
+    <!-- Self-contained on purpose: shown by the service worker when there is no connection,
+         so it cannot depend on app JavaScript or CSS bundles that may not be cached. -->
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Khmer", sans-serif;
+        color: #111; background: #fff; text-align: center; padding: 24px;
+      }
+      main { max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+      img { width: 160px; height: auto; }
+      svg { width: 40px; height: 40px; color: #8a8a8a; }
+      h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: 28px; margin: 0; }
+      p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: #6b6b6b; }
+      .km h1 { font-family: inherit; font-size: 22px; font-weight: 600; }
+      hr { width: 48px; border: 0; border-top: 1px solid #e5e5e5; margin: 4px 0; }
+      button {
+        appearance: none; border: 0; background: #111; color: #fff; font: inherit; font-size: 14px;
+        letter-spacing: .02em; padding: 13px 22px; border-radius: 2px; cursor: pointer; min-width: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img src="/brand/logo-black.png" alt="DANY" width="160" height="48" />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 20h.01M8.5 16.43a5 5 0 0 1 7 0M5 12.86a10 10 0 0 1 5.17-2.69M19 12.86a10 10 0 0 0-2-1.43M2 8.82a15 15 0 0 1 4.18-2.65M22 8.82a15 15 0 0 0-11.29-3.76M2 2l20 20" />
+      </svg>
+      <div>
+        <h1>You're offline</h1>
+        <p>Check your internet connection and try again. Your bag is saved on this phone.</p>
+      </div>
+      <hr />
+      <div class="km" lang="km">
+        <h1>អ្នកមិនមានអ៊ីនធឺណិត</h1>
+        <p>សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត ហើយព្យាយាមម្តងទៀត។ កន្ត្រករបស់អ្នកត្រូវបានរក្សាទុកនៅលើទូរស័ព្ទនេះ។</p>
+      </div>
+      <button type="button" onclick="location.reload()">Try again · ព្យាយាមម្តងទៀត</button>
+    </main>
+  </body>
+</html>

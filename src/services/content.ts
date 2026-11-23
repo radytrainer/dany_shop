@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { storefrontCache } from "@/lib/shared-cache";
 import type { Locale } from "@/i18n/config";
 import type { BannerPlacement } from "@/generated/prisma/enums";
 import { getPricingContext, getProductCardsByIds, getVisibleCategoryIds } from "./catalog";
@@ -30,18 +31,19 @@ export type BannerDTO = {
   mobileImageUrl: string | null;
 };
 
+/** Active banners of a placement (cached; the schedule window is checked per request). */
+const loadBannerRows = storefrontCache(async (placement: BannerPlacement) => {
+  const rows = await prisma.banner.findMany({ where: { placement, isActive: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }] });
+  return rows.map((b) => ({ ...b, startsAt: b.startsAt?.toISOString() ?? null, endsAt: b.endsAt?.toISOString() ?? null, createdAt: null, updatedAt: null }));
+}, "banners");
+
 export const getBanners = cache(async (placement: BannerPlacement, locale: Locale): Promise<BannerDTO[]> => {
-  const now = new Date();
+  const now = Date.now();
   const { showCollections } = await getStoreSettings();
   const href = (h: string | null) => (!showCollections && h?.startsWith("/collections") ? null : h);
-  const rows = await prisma.banner.findMany({
-    where: {
-      placement,
-      isActive: true,
-      AND: [{ OR: [{ startsAt: null }, { startsAt: { lte: now } }] }, { OR: [{ endsAt: null }, { endsAt: { gte: now } }] }],
-    },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
-  });
+  const rows = (await loadBannerRows(placement)).filter(
+    (b) => (!b.startsAt || Date.parse(b.startsAt) <= now) && (!b.endsAt || Date.parse(b.endsAt) >= now),
+  );
   return rows.map((b) =>
     pickTranslation(
       {
@@ -72,7 +74,9 @@ export type CollectionDTO = {
   productCount: number;
 };
 
-export const listCollections = cache(async (locale: Locale, featuredOnly = false): Promise<CollectionDTO[]> => {
+export const listCollections = cache((locale: Locale, featuredOnly = false) => loadCollections(locale, featuredOnly));
+
+const loadCollections = storefrontCache(async (locale: Locale, featuredOnly: boolean): Promise<CollectionDTO[]> => {
   const visibleCategories = await getVisibleCategoryIds();
   const rows = await prisma.collection.findMany({
     where: { isActive: true, ...(featuredOnly ? { isFeatured: true } : {}) },
@@ -87,7 +91,7 @@ export const listCollections = cache(async (locale: Locale, featuredOnly = false
     ),
     productCount: c._count.products,
   }));
-});
+}, "collections");
 
 export async function getCollectionBySlug(slug: string, locale: Locale): Promise<CollectionDTO | null> {
   const all = await listCollections(locale);

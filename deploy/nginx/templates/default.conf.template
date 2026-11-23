@@ -41,7 +41,9 @@ server {
     server_tokens off;
 
     gzip on;
-    gzip_types text/plain text/css application/json application/javascript image/svg+xml;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_types text/plain text/css application/json application/javascript text/javascript text/x-component application/manifest+json image/svg+xml;
     gzip_min_length 1024;
 
     # www → apex

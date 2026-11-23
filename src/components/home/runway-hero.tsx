@@ -161,7 +161,8 @@ export function RunwayHero({ banner, looks, fallbackTitle, fallbackText }: { ban
                         className="block h-full w-full cursor-pointer"
                         aria-label={t("home.viewLook", { number: i + 1 })}
                       >
-                        <LookImage look={look} />
+                        {/* Fully hidden looks (opacity 0) load their image only when they move into view. */}
+                        {slot === "hidden" ? <div className="h-full w-full" /> : <LookImage look={look} />}
                       </button>
                     )}
                   </motion.div>

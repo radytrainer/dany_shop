@@ -61,7 +61,10 @@ const nextConfig: NextConfig = {
     },
   },
   images: {
-    formats: ["image/avif", "image/webp"],
+    // WebP only: AVIF takes ~50% longer to encode, which makes first image loads slow on a small
+    // server. Optimized images are kept 30 days (in the next-cache volume, so they survive deploys).
+    formats: ["image/webp"],
+    minimumCacheTTL: 2_592_000,
     qualities: [60, 75, 85],
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },
@@ -75,6 +78,14 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Service worker: always revalidate so app updates reach installed phones on the next visit.
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
       // PDF receipts: the HTML page policy (object-src 'none') must not block the browser's
       // built-in PDF viewer. A later entry overrides an earlier one for the same header key.
       { source: "/api/orders/:orderNumber/receipt", headers: [{ key: "Content-Security-Policy", value: "frame-ancestors 'none'" }] },

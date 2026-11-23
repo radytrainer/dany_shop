@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { storefrontCache } from "@/lib/shared-cache";
 import type { Locale } from "@/i18n/config";
 
 export const HOMEPAGE_SECTION_KEYS = [
@@ -108,8 +109,13 @@ const DEFAULTS: StoreSettingsDTO = {
   socialGallery: [],
 };
 
-/** Store settings (singleton row), memoised per request. Falls back to defaults if not seeded. */
-export const getStoreSettings = cache(async (): Promise<StoreSettingsDTO> => {
+/**
+ * Store settings (singleton row): cached across requests (cleared on every admin save) and
+ * memoised per request. Falls back to defaults if not seeded.
+ */
+export const getStoreSettings = cache(() => loadStoreSettings());
+
+const loadStoreSettings = storefrontCache(async (): Promise<StoreSettingsDTO> => {
   const row = await prisma.storeSettings.findUnique({ where: { id: "default" } });
   if (!row) return DEFAULTS;
   const sections = sectionsSchema.parse(row.homepageSections);
@@ -151,7 +157,7 @@ export const getStoreSettings = cache(async (): Promise<StoreSettingsDTO> => {
     homepageSections,
     socialGallery: gallerySchema.parse(row.socialGallery),
   };
-});
+}, "settings");
 
 /** Pick a translated settings field, falling back to the base value. */
 export function localizedSetting(

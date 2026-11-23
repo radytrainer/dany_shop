@@ -53,6 +53,8 @@ services:
       <<: *app-env
     volumes:
       - uploads:/app/storage/uploads
+      # Optimized images + cached storefront data survive restarts and deploys.
+      - next-cache:/app/.next/cache
     depends_on:
       db: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
@@ -125,5 +127,6 @@ services:
 volumes:
   pgdata:
   uploads:
+  next-cache:
   certbot-www:
   certbot-certs:

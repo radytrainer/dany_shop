@@ -34,6 +34,8 @@ RUN apk add --no-cache wget \
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+# Optimized-image and data cache; mounted as a volume in production so it survives deploys.
+RUN mkdir -p /app/.next/cache && chown nextjs:nodejs /app/.next/cache
 USER nextjs
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \

@@ -1,8 +1,12 @@
 /**
  * Database seed.
  *  - Reference data (sizes, colors, categories, delivery methods, settings, admin) is always seeded.
- *  - Demo catalog (products, banners, collections, coupons, demo customer) is seeded ONLY when
- *    NODE_ENV !== "production" or SEED_DEMO=true. Never ship demo products to production.
+ *  - Demo catalog (products, banners, category images, collections, coupons) is seeded when
+ *    NODE_ENV !== "production" or SEED_DEMO=true. In production it is loaded once, on purpose,
+ *    with deploy/aws/demo.sh load — it gives the seller example products to edit or replace.
+ *  - Never in production, even with SEED_DEMO=true: demo logins (published passwords),
+ *    placeholder Telegram/WhatsApp/Messenger accounts, and test-only coupons.
+ *  - DEMO_ACTION=remove deletes the demo catalog again (deploy/aws/demo.sh remove).
  * Idempotent: safe to run repeatedly.
  */
 import "dotenv/config";
@@ -13,7 +17,9 @@ import { seedKhmerDemoContent, seedOptionTranslations } from "./seed-khmer";
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL! }) });
 
-const SEED_DEMO = process.env.SEED_DEMO === "true" || process.env.NODE_ENV !== "production";
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const SEED_DEMO = process.env.SEED_DEMO === "true" || !IS_PRODUCTION;
+const DEMO_IMAGE_PREFIX = "https://images.unsplash.com/";
 
 const img = (id: string, w = 1200) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=${w}&q=80`;
 
@@ -144,6 +150,11 @@ async function seedReference() {
         imageUrl: SEED_DEMO ? cat.image : null, bannerUrl: SEED_DEMO ? cat.banner : null,
       },
     });
+    // Demo loaded into an existing shop: give categories that still have no picture the demo ones.
+    if (SEED_DEMO) {
+      await prisma.category.updateMany({ where: { id: parent.id, imageUrl: null }, data: { imageUrl: cat.image } });
+      await prisma.category.updateMany({ where: { id: parent.id, bannerUrl: null }, data: { bannerUrl: cat.banner } });
+    }
     await prisma.categoryTranslation.upsert({
       where: { categoryId_locale: { categoryId: parent.id, locale: "km" } },
       update: {},
@@ -192,9 +203,10 @@ async function seedReference() {
       khrExchangeRate: "4100",
       showKhrEquivalent: true,
       // Placeholders — configure the real accounts in Admin → Settings.
-      telegramUsername: SEED_DEMO ? "dany_shop_demo" : null,
-      whatsappNumber: SEED_DEMO ? "85512345678" : null,
-      messengerUrl: SEED_DEMO ? "https://m.me/danyshopdemo" : null,
+      // Placeholder accounts only in development: in production orders must reach the real seller.
+      telegramUsername: SEED_DEMO && !IS_PRODUCTION ? "dany_shop_demo" : null,
+      whatsappNumber: SEED_DEMO && !IS_PRODUCTION ? "85512345678" : null,
+      messengerUrl: SEED_DEMO && !IS_PRODUCTION ? "https://m.me/danyshopdemo" : null,
       defaultChannel: "TELEGRAM",
       contactEmail: "hello@dany.shop",
       contactPhone: "+855 12 345 678",
@@ -423,14 +435,15 @@ async function seedDemo() {
   const accessories = await prisma.category.findUnique({ where: { slug: "accessories" } });
   await prisma.coupon.upsert({ where: { code: "WELCOME10" }, update: {}, create: { code: "WELCOME10", description: "10% off your first order", type: "PERCENTAGE", value: "10", maxDiscount: "30" } });
   await prisma.coupon.upsert({ where: { code: "SUMMER5" }, update: {}, create: { code: "SUMMER5", description: "$5 off orders over $30", type: "FIXED", value: "5", minOrderAmount: "30" } });
-  await prisma.coupon.upsert({ where: { code: "EXPIRED20" }, update: {}, create: { code: "EXPIRED20", description: "Expired test coupon", type: "PERCENTAGE", value: "20", expiresAt: new Date("2025-01-01") } });
+  if (!IS_PRODUCTION) await prisma.coupon.upsert({ where: { code: "EXPIRED20" }, update: {}, create: { code: "EXPIRED20", description: "Expired test coupon", type: "PERCENTAGE", value: "20", expiresAt: new Date("2025-01-01") } });
   if (accessories && (await prisma.promotion.count()) === 0) {
     await prisma.promotion.create({
       data: { name: "Accessories week — 15% off", type: "PERCENTAGE", value: "15", scope: "CATEGORY", categories: { connect: [{ id: accessories.id }] } },
     });
   }
 
-  // Staff + demo customer
+  // Staff + demo customer: development only (their passwords are published in this repository).
+  if (IS_PRODUCTION) return;
   const demoUsers = [
     { email: "staff@dany.local", name: "Store Staff", role: "STAFF" as const, password: "Staff@12345" },
     { email: "customer@dany.local", name: "Sokha Chan", role: "CUSTOMER" as const, password: "Customer@123", phone: "012345678" },
@@ -451,16 +464,53 @@ async function seedDemo() {
   }
 }
 
+/**
+ * Remove the demo catalog. A product counts as demo only when BOTH its slug and SKU match the
+ * seed list, so products the seller created (or renamed demo products) are never touched.
+ * Demo products that appear in real orders are archived instead of deleted (order history).
+ */
+async function removeDemo() {
+  const demo = PRODUCTS.map((p, index) => ({ slug: slugify(p.name), sku: `DN-${String(index + 1).padStart(4, "0")}` }));
+  const products = await prisma.product.findMany({
+    where: { OR: demo },
+    select: { id: true, name: true, _count: { select: { orderItems: true } } },
+  });
+  let deleted = 0;
+  let archived = 0;
+  for (const p of products) {
+    if (p._count.orderItems > 0) {
+      await prisma.product.update({ where: { id: p.id }, data: { status: "ARCHIVED" } });
+      archived++;
+    } else {
+      await prisma.product.delete({ where: { id: p.id } });
+      deleted++;
+    }
+  }
+  const banners = await prisma.banner.deleteMany({ where: { imageUrl: { startsWith: DEMO_IMAGE_PREFIX } } });
+  const collections = await prisma.collection.deleteMany({ where: { slug: { in: ["summer-collection", "winter-collection", "the-tailoring-edit"] } } });
+  await prisma.category.updateMany({ where: { imageUrl: { startsWith: DEMO_IMAGE_PREFIX } }, data: { imageUrl: null } });
+  await prisma.category.updateMany({ where: { bannerUrl: { startsWith: DEMO_IMAGE_PREFIX } }, data: { bannerUrl: null } });
+  const settings = await prisma.storeSettings.findUnique({ where: { id: "default" }, select: { socialGallery: true } });
+  if (JSON.stringify(settings?.socialGallery ?? []).includes(DEMO_IMAGE_PREFIX)) {
+    await prisma.storeSettings.update({ where: { id: "default" }, data: { socialGallery: [] } });
+  }
+  console.log(`Demo removed: ${deleted} products deleted, ${archived} archived (they appear in orders), ${banners.count} banners, ${collections.count} collections; demo category pictures cleared.`);
+}
+
 async function main() {
+  if (process.env.DEMO_ACTION === "remove") {
+    await removeDemo();
+    return;
+  }
   console.log("Seeding reference data…");
   await seedReference();
   await seedOptionTranslations(prisma);
   if (SEED_DEMO) {
-    console.log("Seeding demo catalog (development only)…");
+    console.log("Seeding demo catalog…");
     await seedDemo();
     await seedKhmerDemoContent(prisma);
   } else {
-    console.log("Production mode: demo catalog skipped.");
+    console.log("Production mode: demo catalog skipped (load it with deploy/aws/demo.sh load).");
   }
   console.log("Seed complete.");
 }
